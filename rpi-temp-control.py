@@ -3,11 +3,14 @@
 ##
 # rpi-temp-control
 #
-#
+# Changes speed of system fan to try and control the CPU/GPU temperature. This is done through the use of a PID loop
+# that is targeting a specific temperature.
 #
 # Matt Kohls
+# 2018
+#
+# Licensed under GPL v3
 
-import subprocess
 from gpiozero import Motor
 from pid import PID
 from time import sleep
@@ -22,14 +25,10 @@ MIN_FAN_SPEED = 80 / 100
 #
 # @return temperature of GPU/CPU
 def grab_temp():
-    try:
-        file = open("/sys/class/thermal/thermal_zone0/temp", "r")
+    val = 0
+    with open("/sys/class/thermal/thermal_zone0/temp", "r") as file:
         val = int(file.readline()) / 1000
-        file.close()
-        return val
-    except:
-        print("Error reading from thermal zone")
-        return 0
+    return val
 
 # Initial loop setup
 ploop = PID(1, 1, .02, Integrator_max=100, Integrator_min=0, Set_Point=TEMP_TARGET)
@@ -42,9 +41,8 @@ last_temp = 0
 while True:
     sleep(1)
     temp = grab_temp()
-    print(temp)
-    cycle_change = (ploop.update(temp)) * -1
-    cycle = (100 + int(cycle_change)) / 100 # Since fan.forward() wants a number between 0 and 1
+    cycle_change = ploop.update(temp)
+    cycle = (100 - int(cycle_change)) / 100 # Since fan.forward() wants a number between 0 and 1
 
     if cycle <= .2:
         cycle = 0
